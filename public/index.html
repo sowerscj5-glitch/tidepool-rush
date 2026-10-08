@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tidepool Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+/* Layout: one-screen arcade. A slim tide bar on top, the pool fills the rest, HUD floats over the water. Single dark look by choice (it's underwater). */
+:root{
+  --abyss:#061520;
+  --deep:#0b2533;
+  --shoal:#1a4256;
+  --foam:#e6f4f1;
+  --mist:#8fb3b8;
+  --coral:#ff7a9c;
+  --glass:#7fe3d0;
+  --pearl:#fff3d6;
+  --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--abyss);color:var(--foam);font-family:var(--display);overflow:hidden}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr;gap:10px;padding-inline:16px;padding-block:10px 14px;box-sizing:border-box}
+header{display:flex;align-items:center;gap:8px 20px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:22px;line-height:1;letter-spacing:.01em;margin:0}
+.brand span{color:var(--coral)}
+.tide{font-family:var(--mono);font-size:13px;color:var(--mist);display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;margin-left:auto;font-variant-numeric:tabular-nums}
+.tide b{color:var(--foam);font-weight:500}
+.iconbtn{font:500 12px var(--mono);color:var(--mist);background:transparent;border:1px solid var(--shoal);border-radius:999px;padding:4px 10px;cursor:pointer}
+.iconbtn:hover{color:var(--foam);border-color:var(--mist)}
+.pool{position:relative;min-height:0;border-radius:18px;overflow:hidden;background:var(--deep);box-shadow:inset 0 0 0 1px var(--shoal)}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+
+.board{position:absolute;top:12px;left:12px;min-width:150px;max-width:min(220px,46%);background:color-mix(in srgb,var(--abyss) 72%,transparent);border:1px solid var(--shoal);border-radius:12px;padding:10px 12px;pointer-events:none;backdrop-filter:blur(4px)}
+.board h2{margin:0 0 6px;font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mist)}
+.board ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.board li{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:8px;font:500 13px var(--mono);font-variant-numeric:tabular-nums}
+.board li .dot{width:10px;height:10px;border-radius:50%}
+.board li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board li.me .nm{color:var(--pearl)}
+.powers{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.powers span{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--abyss);background:var(--pearl);border-radius:999px;padding:2px 7px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row .go{flex:1}
+.board .empty{font:400 12px var(--mono);color:var(--mist)}
+
+.dash{position:absolute;right:14px;bottom:14px;width:74px;height:74px;border-radius:50%;border:2px solid var(--coral);background:color-mix(in srgb,var(--coral) 18%,transparent);color:var(--foam);font:600 15px var(--display);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.dash:disabled{opacity:.35;cursor:default}
+.dash small{display:block;font:400 10px var(--mono);color:var(--mist);margin-top:2px}
+
+.note{position:absolute;left:12px;bottom:12px;max-width:min(360px,60%);font:400 12px/1.4 var(--mono);color:var(--mist);pointer-events:none}
+
+.card{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:color-mix(in srgb,var(--abyss) 55%,transparent)}
+.panel{width:min(380px,100%);background:var(--deep);border:1px solid var(--shoal);border-radius:20px;padding:22px 22px 20px;display:grid;gap:14px;box-shadow:0 20px 60px #0008}
+.panel h2{margin:0;font-weight:700;font-size:28px;line-height:1.05;text-wrap:balance}
+.panel h2 span{color:var(--glass)}
+.panel p{margin:0;color:var(--mist);font-size:15px;line-height:1.45}
+.rules{margin:0;padding:0;list-style:none;display:grid;gap:6px;font:400 13px/1.4 var(--mono);color:var(--foam)}
+.rules li{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:baseline}
+.rules i{font-style:normal;color:var(--glass)}
+label{font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mist)}
+.field{display:grid;gap:6px}
+input[type=text],input[type=password]{font:500 17px var(--display);color:var(--foam);background:var(--abyss);border:1px solid var(--shoal);border-radius:10px;padding:10px 12px;outline:none}
+input[type=text]:focus,input[type=password]:focus{border-color:var(--glass)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatches button{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.swatches button[aria-pressed=true]{border-color:var(--foam);box-shadow:0 0 0 3px var(--abyss) inset}
+.go{font:600 18px var(--display);color:var(--abyss);background:var(--glass);border:0;border-radius:12px;padding:12px;cursor:pointer}
+.go:hover{filter:brightness(1.08)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--pearl);outline-offset:2px}
+
+.results .panel{text-align:center}
+.results .podium{list-style:none;margin:0;padding:0;display:grid;gap:6px;text-align:left}
+.results .podium li{display:grid;grid-template-columns:22px 12px 1fr auto;gap:10px;align-items:center;font:500 15px var(--mono);font-variant-numeric:tabular-nums;padding:6px 10px;border-radius:10px;background:var(--abyss)}
+.results .podium li .rk{color:var(--mist)}
+.results .podium li .dot{width:12px;height:12px;border-radius:50%}
+.results .podium li.me{box-shadow:inset 0 0 0 1px var(--pearl)}
+.results .next{font:400 13px var(--mono);color:var(--mist)}
+
+@media (max-width:520px){
+  .brand{font-size:19px}
+  .tide{margin-left:0;width:100%;justify-content:space-between}
+  .board{min-width:0;padding:8px 10px}
+  .board li{font-size:12px}
+  .note{max-width:calc(100% - 110px);font-size:11px}
+}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 class="brand" id="brand">Tidepool <span>Rush</span></h1>
+    <div class="tide">
+      <span id="clock">Tide ends in <b>1:30</b></span>
+      <span id="crowd">Connecting…</span>
+      <button class="iconbtn" id="mute" type="button" aria-pressed="false">Sound on</button>
+    </div>
+  </header>
+
+  <div class="pool" id="pool">
+    <canvas id="cv" aria-label="The tidepool arena"></canvas>
+
+    <div class="board" aria-live="polite">
+      <h2 id="boardTitle">This tide</h2>
+      <ol id="board"></ol>
+      <div class="powers" id="powers" hidden></div>
+    </div>
+
+    <button class="dash" id="dash" type="button" hidden>Jet<small>space</small></button>
+    <div class="note" id="note"></div>
+
+    <div class="card" id="join">
+      <form class="panel" id="joinForm" autocomplete="off">
+        <h2>Glow up. <span>Grab the plankton.</span></h2>
+        <p>Everyone who opens this page swims in the same pool. Each tide lasts 90 seconds; the fullest jelly wins.</p>
+        <ul class="rules">
+          <li><i>●</i><span>Plankton is 1 point. Pearls are 5.</span></li>
+          <li><i>→</i><span>Steer with WASD, arrows, or hold a finger in the water.</span></li>
+          <li><i>»</i><span>Jet (space) into a rival to steal 3 points.</span></li>
+        </ul>
+        <div class="field">
+          <label for="nameInput">Your jelly's name</label>
+          <input type="text" id="nameInput" maxlength="14" placeholder="e.g. Marlowe">
+        </div>
+        <div class="field">
+          <label id="glowLabel">Glow</label>
+          <div class="swatches" id="swatches" role="group" aria-labelledby="glowLabel"></div>
+        </div>
+        <button class="go" type="submit">Dive in</button>
+      </form>
+    </div>
+
+    <div class="card" id="codes" hidden>
+      <form class="panel" id="codeForm" autocomplete="off">
+        <h2>Owner <span>codes</span></h2>
+        <div class="field">
+          <label for="codeInput">Owner key or power code</label>
+          <input type="password" id="codeInput" maxlength="64" spellcheck="false" autocomplete="off">
+        </div>
+        <p id="codeMsg"></p>
+        <div class="row">
+          <button class="go" type="submit">Activate</button>
+          <button class="iconbtn" type="button" id="codeClose">Back to the pool</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card results" id="results" hidden>
+      <div class="panel">
+        <h2 id="resTitle">Low tide</h2>
+        <ol class="podium" id="podium"></ol>
+        <div class="next" id="resNext">Next tide in 0:10</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- constants ----------
+  const W = 1600, H = 1000, R = 22, N_ORBS = 32;
+  const CYCLE = 100000, PLAY = 90000;            // 90 s tide + 10 s low tide, aligned to the wall clock
+  const SPEED = 300, DASH_V = 1000, DASH_MS = 210, DASH_CD = 1500, STEAL = 3, INV_MS = 1400;
+  const COLORS = ['#ff7a9c', '#7fe3d0', '#ffd36e', '#b6a6ff', '#7cc4ff', '#ff9f5a'];
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d');
+
+  // ---------- state ----------
+  let room = null, roomState = 'connecting', myPeer = null;
+  const me = {
+    joined: false, name: '', c: 0, x: W / 2, y: H / 2, vx: 0, vy: 0,
+    score: 0, round: -1, dashId: 0, dashUntil: 0, dashReady: 0, invUntil: 0,
+    hitK: 0, hits: [], mine: new Set(), best: 0
+  };
+  const processed = new Set();   // dashes that already hit me: `${peer}:${dashId}`
+  const credited = new Set();    // steals already credited to me: `${victim}:${k}`
+  const disp = new Map();        // smoothed remote positions by peer label
+  const popups = [];
+  const keys = new Set();
+  let steer = null;              // {id, x, y} pointer steering target in world coords
+  let muted = false, ac = null;
+
+  try {
+    const s = JSON.parse(localStorage.getItem('tidepool-rush') || '{}');
+    if (typeof s.name === 'string') me.name = s.name.slice(0, 14);
+    if (Number.isInteger(s.c) && s.c >= 0 && s.c < COLORS.length) me.c = s.c; else me.c = Math.floor(Math.random() * COLORS.length);
+    if (typeof s.muted === 'boolean') muted = s.muted;
+  } catch { me.c = Math.floor(Math.random() * COLORS.length); }
+  // names are shown to every player, so slurs are swapped out
+  const BAD = /n+[i1!|y]+gg|n+[i1!|]+g+[e3]+r|n+[i1!|]+g+[a@4]+[hzs]?$|f+[a@4]+gg|f+[a@4]+g+[o0]+t|f+[a@4]+g$|k+[i1y]+k+[e3]+|ch[i1]nk|tr[a@4]nn(y|ie)|r[e3]t[a@4]rd|w[e3]tb[a@4]ck/;
+  const clean = s => BAD.test(String(s).toLowerCase().replace(/[^a-z0-9@!|$]/g, '').replace(/\$/g, 's'));
+  if (me.name && clean(me.name)) me.name = '';
+  const save = () => { try { localStorage.setItem('tidepool-rush', JSON.stringify({ name: me.name, c: me.c, muted })); } catch {} };
+
+  // ---------- deterministic orbs (every viewer computes the same pool) ----------
+  function hash(a, b, c) {
+    let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263) ^ Math.imul(c | 0, 1440662683);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    h = Math.imul(h, 2246822519);
+    h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  }
+  function orbsAt(now, round) {
+    const out = [];
+    for (let i = 0; i < N_ORBS; i++) {
+      const per = 6000 + Math.floor(hash(i, 1, 9) * 7000);
+      const off = Math.floor(hash(i, 2, 9) * per);
+      const t = now + off, g = Math.floor(t / per), age = t - g * per;
+      out.push({
+        id: i + '.' + g, i, g, age, per,
+        x: 70 + hash(i, g, round) * (W - 140),
+        y: 70 + hash(i, g, round + 7919) * (H - 140),
+        gold: hash(i, g, 31) < 0.1
+      });
+    }
+    return out;
+  }
+
+  // ---------- helpers ----------
+  const num = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v)) ? v : d;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const colorOf = c => COLORS[clamp(Math.floor(num(c)), 0, COLORS.length - 1)];
+  const nameOf = p => (typeof p.presence.n === 'string' && p.presence.n.trim() && !clean(p.presence.n)) ? p.presence.n.slice(0, 14) : 'Jelly';
+
+  function blip(f, d = 0.08, type = 'sine', vol = 0.08, slide = 0) {
+    if (muted || !ac) return;
+    try {
+      const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02);
+    } catch {}
+  }
+  const pop = (x, y, text, color) => popups.push({ x, y, text, color, t: performance.now() });
+
+  // ---------- canvas sizing ----------
+  let view = { s: 1, ox: 0, oy: 0, dpr: 1, cw: 0, ch: 0 };
+  function resize() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const s = Math.min(r.width / W, r.height / H);
+    view = { s, ox: (r.width - W * s) / 2, oy: (r.height - H * s) / 2, dpr, cw: r.width, ch: r.height };
+  }
+  new ResizeObserver(resize).observe(cv);
+  resize();
+  const toWorld = (cx, cy) => { const r = cv.getBoundingClientRect(); return { x: (cx - r.left - view.ox) / view.s, y: (cy - r.top - view.oy) / view.s }; };
+
+  // ---------- input ----------
+  addEventListener('keydown', e => {
+    if (e.target instanceof HTMLInputElement) return;
+    const k = e.key.toLowerCase();
+    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
+    if ((k === ' ' || k === 'shift') && !e.repeat) tryDash();
+    keys.add(k);
+  });
+  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  addEventListener('blur', () => { keys.clear(); steer = null; });
+  cv.addEventListener('pointerdown', e => { if (!me.joined) return; cv.setPointerCapture(e.pointerId); steer = { id: e.pointerId, cx: e.clientX, cy: e.clientY }; });
+  cv.addEventListener('pointermove', e => { if (steer && steer.id === e.pointerId) { steer.cx = e.clientX; steer.cy = e.clientY; } });
+  const endSteer = e => { if (steer && steer.id === e.pointerId) steer = null; };
+  cv.addEventListener('pointerup', endSteer); cv.addEventListener('pointercancel', endSteer);
+  $('dash').addEventListener('pointerdown', e => { e.preventDefault(); tryDash(); });
+
+  function inputVec() {
+    let ix = 0, iy = 0;
+    if (keys.has('a') || keys.has('arrowleft')) ix -= 1;
+    if (keys.has('d') || keys.has('arrowright')) ix += 1;
+    if (keys.has('w') || keys.has('arrowup')) iy -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) iy += 1;
+    if (ix || iy) { const m = Math.hypot(ix, iy); return { x: ix / m, y: iy / m }; }
+    if (steer) {
+      Object.assign(steer, toWorld(steer.cx, steer.cy));
+      const dx = steer.x - me.x, dy = steer.y - me.y, d = Math.hypot(dx, dy);
+      if (d > 10) { const m = Math.min(1, d / 120); return { x: dx / d * m, y: dy / d * m }; }
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function tryDash() {
+    const now = Date.now();
+    if (!me.joined || now < me.dashReady || (now % CYCLE) >= PLAY) return;
+    let { x, y } = inputVec();
+    if (!x && !y) { const v = Math.hypot(me.vx, me.vy); if (v > 5) { x = me.vx / v; y = me.vy / v; } else { x = 1; y = 0; } }
+    const m = Math.hypot(x, y); x /= m; y /= m;
+    me.vx = x * DASH_V; me.vy = y * DASH_V;
+    me.dashId++; me.dashUntil = now + DASH_MS; me.dashReady = now + (powers.has('rapidjet') ? 300 : DASH_CD);
+    blip(220, 0.18, 'triangle', 0.07, 260);
+    sendPresence(now, true);
+  }
+
+  // ---------- presence ----------
+  let lastSend = 0;
+  function sendPresence(now, force) {
+    if (!room || !me.joined) return;
+    if (!force && now - lastSend < 50) return;
+    lastSend = now;
+    room.presence({
+      n: me.name, c: me.c,
+      x: Math.round(me.x), y: Math.round(me.y), vx: Math.round(me.vx), vy: Math.round(me.vy),
+      s: me.score, r: me.round, z: scaleOf(), d: me.dashId, dt: now < me.dashUntil ? 1 : 0,
+      t: [...me.mine], h: me.hits, b: me.best
+    }).catch(() => {});
+  }
+
+  // ---------- room ----------
+  // Talks to server.js over a WebSocket. Same shape the game used before: presence(), peers(), onConnection().
+  let onOwnerReply = null;
+  function connectRoom() {
+    const listeners = new Set();
+    let ws = null, connected = false, myId = null, mine = {}, peersArr = [], prev = new Map(), retry = 1000;
+    const send = obj => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+    const setConn = v => { connected = v; listeners.forEach(f => f(v)); };
+    function open() {
+      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+      ws.onopen = () => {
+        retry = 1000; setConn(true);
+        if (Object.keys(mine).length) send({ type: 'presence', data: mine });
+        const k = ownerKey(); if (k) send({ type: 'owner', key: k });
+      };
+      ws.onmessage = e => {
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (!m || typeof m !== 'object') return;
+        if (m.type === 'welcome') myId = m.id;
+        else if (m.type === 'peers' && Array.isArray(m.peers)) {
+          const now = Date.now(), next = new Map();
+          peersArr = m.peers.filter(p => p && typeof p.id === 'string').map(p => {
+            const presence = (p.presence && typeof p.presence === 'object') ? p.presence : {};
+            const json = JSON.stringify(presence), old = prev.get(p.id);
+            const updatedAt = old && old.json === json ? old.updatedAt : now;
+            next.set(p.id, { json, updatedAt });
+            return { peer: p.id, presence, updatedAt, sameTab: p.id === myId, isMe: p.id === myId, kind: 'viewer', guest: false, by: null };
+          });
+          prev = next;
+        } else if (m.type === 'owner' && onOwnerReply) onOwnerReply(!!m.ok);
+      };
+      ws.onclose = () => { setConn(false); peersArr = []; setTimeout(open, retry); retry = Math.min(10000, retry * 1.6); };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+    }
+    open();
+    return {
+      presence(patch) {
+        for (const k in patch) { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; }
+        send({ type: 'presence', data: mine });
+        return Promise.resolve();
+      },
+      peers: () => peersArr,
+      onConnection(fn) { listeners.add(fn); setTimeout(() => fn(connected)); return () => listeners.delete(fn); },
+      claimOwner(key) { send({ type: 'owner', key }); }
+    };
+  }
+  const ownerKey = () => { try { return localStorage.getItem('tidepool-owner') || ''; } catch { return ''; } };
+  room = connectRoom();
+  room.onConnection(c => { roomState = c ? 'live' : 'connecting'; });
+
+  // ---------- bots: keep a lonely swimmer company, leave when real players arrive ----------
+  const BOT_NAMES = ['Bloop', 'Nimbus', 'Marmalade'];
+  let bots = [];
+  function spawnBots() {
+    bots = BOT_NAMES.map((name, i) => ({
+      name, c: (me.c + 1 + i * 2) % COLORS.length, x: 150 + Math.random() * (W - 300), y: 150 + Math.random() * (H - 300),
+      vx: 0, vy: 0, score: 0, mine: new Set(), dashUntil: 0, dashReady: Date.now() + 4000, invUntil: 0, dashId: 0,
+      target: null, retarget: 0, skill: 0.7 + i * 0.08, seed: i * 1.7
+    }));
+  }
+  function stepBots(dt, now, orbs, taken) {
+    for (const b of bots) {
+      if (now >= b.retarget) {
+        b.retarget = now + 400 + Math.random() * 500;
+        let best = null, bestScore = Infinity;
+        for (const o of orbs) {
+          if (taken.has(o.id) || o.age < 350 || o.age > o.per - 600) continue;
+          const d = Math.hypot(o.x - b.x, o.y - b.y) / (o.gold ? 3 : 1) + Math.random() * 120;
+          if (d < bestScore) { bestScore = d; best = o; }
+        }
+        b.target = best ? { x: best.x, y: best.y } : { x: 100 + Math.random() * (W - 200), y: 100 + Math.random() * (H - 200) };
+      }
+      // occasionally jet at the player when they have points worth taking
+      const pd = Math.hypot(me.x - b.x, me.y - b.y);
+      if (now >= b.dashReady && pd < 170 && me.score >= 2 && now >= me.invUntil && Math.random() < dt * 2.2) {
+        b.vx = (me.x - b.x) / pd * DASH_V * 0.9; b.vy = (me.y - b.y) / pd * DASH_V * 0.9;
+        b.dashUntil = now + DASH_MS; b.dashReady = now + 3500 + Math.random() * 3000; b.dashId++;
+      }
+      if (now >= b.dashUntil && b.target) {
+        const dx = b.target.x - b.x, dy = b.target.y - b.y, d = Math.hypot(dx, dy) || 1, m = Math.min(1, d / 90);
+        const k = Math.min(1, dt * 5);
+        b.vx += (dx / d * m * SPEED * b.skill - b.vx) * k; b.vy += (dy / d * m * SPEED * b.skill - b.vy) * k;
+      }
+      b.x = clamp(b.x + b.vx * dt, R, W - R); b.y = clamp(b.y + b.vy * dt, R, H - R);
+      for (const o of orbs) {
+        if (taken.has(o.id) || o.age < 350 || o.age > o.per - 250) continue;
+        if (Math.hypot(o.x - b.x, o.y - b.y) < R + (o.gold ? 14 : 10)) { b.mine.add(o.id); taken.add(o.id); b.score += o.gold ? 5 : 1; b.retarget = 0; }
+      }
+      // bot jets into me
+      if (now < b.dashUntil && now >= me.invUntil && !powers.has('ghost') && pd < R * (1 + scaleOf()) + 12 && !processed.has('bot' + b.name + ':' + b.dashId)) {
+        processed.add('bot' + b.name + ':' + b.dashId);
+        const loss = Math.min(STEAL, me.score); me.score -= loss; b.score += loss;
+        me.invUntil = now + INV_MS; me.vx = (me.x - b.x) / (pd || 1) * 700; me.vy = (me.y - b.y) / (pd || 1) * 700; me.dashUntil = now + 160;
+        pop(me.x, me.y - R - 10, loss ? '−' + loss : 'bonk', '#ff7a9c'); blip(180, 0.22, 'sawtooth', 0.05, -100);
+      }
+      // I jet into a bot
+      if (now < me.dashUntil && now >= b.invUntil && pd < R * (1 + scaleOf()) + 12 && !processed.has('me:' + me.dashId + ':' + b.name)) {
+        processed.add('me:' + me.dashId + ':' + b.name);
+        const loss = Math.min(STEAL, b.score); b.score -= loss; me.score += loss;
+        b.invUntil = now + INV_MS; b.vx = (b.x - me.x) / (pd || 1) * 700; b.vy = (b.y - me.y) / (pd || 1) * 700; b.dashUntil = now + 160;
+        if (loss) { pop(me.x, me.y - R - 10, '+' + loss + ' stolen', '#ffd36e'); blip(520, 0.1, 'square', 0.04, 300); }
+      }
+    }
+  }
+
+  // ---------- owner superpowers ----------
+  // Only the owner can activate these: the server checks the OWNER_KEY you set when hosting.
+  const POWERS = {
+    zoomies:   'Zoomies: swim 1.8× faster',
+    titan:     'Titan: double size, everyone sees it',
+    magnet:    'Magnet: grab orbs from far away',
+    ghost:     'Ghost: nobody can steal from you',
+    rapidjet:  'Rapid jet: jet cooldown almost gone',
+    pearlrain: 'Pearl rain: every orb is worth 5'
+  };
+  const powers = new Set();
+  let isOwner = false;
+  const scaleOf = () => powers.has('titan') ? 2 : 1;
+  onOwnerReply = ok => {
+    if (ok) { isOwner = true; }
+    else { try { localStorage.removeItem('tidepool-owner'); } catch {} }
+    if (!$('codes').hidden) $('codeMsg').textContent = ok ? 'Owner unlocked. Type a power code ("list" shows them).' : 'That key is wrong.';
+  };
+
+  function openCodes() {
+    $('codes').hidden = false; $('codeInput').value = '';
+    $('codeMsg').textContent = isOwner ? 'Type a code. "list" shows them all, "off" clears.' : 'Enter the owner key.';
+    setTimeout(() => $('codeInput').focus(), 0);
+  }
+  let titleTaps = 0, titleTimer = 0;
+  $('brand').addEventListener('click', () => {
+    titleTaps++; clearTimeout(titleTimer); titleTimer = setTimeout(() => titleTaps = 0, 1200);
+    if (titleTaps >= 5) { titleTaps = 0; openCodes(); }
+  });
+  addEventListener('keydown', e => { if (e.key === '`' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); openCodes(); } });
+  $('codeClose').addEventListener('click', () => { $('codes').hidden = true; });
+  $('codeForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!isOwner) {
+      const key = $('codeInput').value.trim();
+      if (key) { try { localStorage.setItem('tidepool-owner', key); } catch {} room.claimOwner(key); $('codeMsg').textContent = 'Checking…'; }
+      $('codeInput').value = ''; return;
+    }
+    const code = $('codeInput').value.trim().toLowerCase().replace(/\s+/g, '');
+    const msg = $('codeMsg');
+    if (code === 'list') msg.textContent = Object.keys(POWERS).join(' · ');
+    else if (code === 'off') { powers.clear(); msg.textContent = 'All powers off.'; }
+    else if (POWERS[code]) {
+      if (powers.has(code)) { powers.delete(code); msg.textContent = POWERS[code].split(':')[0] + ' off.'; }
+      else { powers.add(code); msg.textContent = POWERS[code] + '.'; blip(660, 0.25, 'triangle', 0.07, 660); }
+    } else msg.textContent = 'Nothing happens.';
+    $('codeInput').value = '';
+    renderPowers(); sendPresence(Date.now(), true);
+  });
+  function renderPowers() {
+    const box = $('powers'); box.replaceChildren();
+    for (const p of powers) { const s = document.createElement('span'); s.textContent = POWERS[p].split(':')[0]; box.append(s); }
+    box.hidden = !powers.size;
+  }
+
+  // ---------- simulation ----------
+  let lastTs = performance.now(), lastBoard = 0;
+  function frame(ts) {
+    const dt = Math.min(0.05, (ts - lastTs) / 1000); lastTs = ts;
+    const now = Date.now();
+    const round = Math.floor(now / CYCLE), phase = now % CYCLE, playing = phase < PLAY;
+
+    if (round !== me.round) {
+      me.round = round; me.score = 0; me.mine.clear(); me.hits = [];
+      for (const b of bots) { b.score = 0; b.mine.clear(); }
+    }
+
+    // peers
+    const all = room ? room.peers() : [];
+    const self = all.find(p => p.sameTab);
+    if (self) myPeer = self.peer;
+    const swimmers = all.filter(p => !p.sameTab && p.kind === 'viewer' && p.presence && typeof p.presence.n === 'string');
+    const watchers = all.filter(p => !p.sameTab && p.kind === 'viewer' && !(p.presence && typeof p.presence.n === 'string')).length;
+    const seen = new Set();
+    for (const p of swimmers) {
+      seen.add(p.peer);
+      const pr = p.presence;
+      const age = Math.min(0.12, Math.max(0, (now - p.updatedAt) / 1000));
+      const tx = clamp(num(pr.x, W / 2) + num(pr.vx) * age, 0, W), ty = clamp(num(pr.y, H / 2) + num(pr.vy) * age, 0, H);
+      let d = disp.get(p.peer);
+      if (!d) { d = { x: tx, y: ty }; disp.set(p.peer, d); }
+      const k = 1 - Math.exp(-dt * 16);
+      d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
+    }
+    for (const key of disp.keys()) if (!seen.has(key)) disp.delete(key);
+    const rivals = swimmers.filter(p => num(p.presence.r) === round);
+
+    // bots fill in only while no real player is in the water
+    const lonely = me.joined && swimmers.length === 0;
+    if (lonely && !bots.length) spawnBots();
+    if (!lonely && bots.length) bots = [];
+
+    // orbs & what's taken
+    const orbs = playing ? orbsAt(now, round) : [];
+    const live = new Set(orbs.map(o => o.id));
+    for (const id of me.mine) if (!live.has(id)) me.mine.delete(id);
+    const taken = new Set(me.mine);
+    for (const b of bots) { for (const id of b.mine) if (!live.has(id)) b.mine.delete(id); for (const id of b.mine) taken.add(id); }
+    for (const p of rivals) if (Array.isArray(p.presence.t)) for (const id of p.presence.t.slice(0, 64)) if (typeof id === 'string') taken.add(id);
+
+    if (me.joined) {
+      // movement
+      const iv = inputVec();
+      if (now >= me.dashUntil) {
+        const k = Math.min(1, dt * 7);
+        const sp = SPEED * (powers.has('zoomies') ? 1.8 : 1);
+        me.vx += (iv.x * sp - me.vx) * k; me.vy += (iv.y * sp - me.vy) * k;
+      }
+      me.x += me.vx * dt; me.y += me.vy * dt;
+      const mr = R * scaleOf();
+      if (me.x < mr) { me.x = mr; me.vx = Math.abs(me.vx) * 0.6; }
+      if (me.x > W - mr) { me.x = W - mr; me.vx = -Math.abs(me.vx) * 0.6; }
+      if (me.y < mr) { me.y = mr; me.vy = Math.abs(me.vy) * 0.6; }
+      if (me.y > H - mr) { me.y = H - mr; me.vy = -Math.abs(me.vy) * 0.6; }
+
+      // soft bumps against everyone in the water
+      for (const p of swimmers) {
+        const d = disp.get(p.peer); if (!d) continue;
+        const dx = me.x - d.x, dy = me.y - d.y, dist = Math.hypot(dx, dy) || 1;
+        const reach = R * (scaleOf() + clamp(num(p.presence.z, 1), 1, 2));
+        if (dist < reach) { const push = (reach - dist) * 0.5; me.x += dx / dist * push; me.y += dy / dist * push; }
+      }
+
+      if (playing && bots.length) stepBots(dt, now, orbs, taken);
+      if (playing) {
+        // collect
+        for (const o of orbs) {
+          if (taken.has(o.id) || o.age < 350 || o.age > o.per - 250) continue;
+          if (Math.hypot(o.x - me.x, o.y - me.y) < R * scaleOf() + (o.gold ? 14 : 10) + (powers.has('magnet') ? 130 : 0)) {
+            me.mine.add(o.id); taken.add(o.id);
+            const val = (o.gold || powers.has('pearlrain')) ? 5 : 1;
+            me.score += val;
+            pop(o.x, o.y - 10, '+' + val, o.gold ? '#fff3d6' : '#7fe3d0');
+            o.gold ? (blip(880, 0.12, 'sine', 0.08, 440), setTimeout(() => blip(1320, 0.14, 'sine', 0.06), 70)) : blip(620 + Math.random() * 120, 0.06, 'sine', 0.05);
+          }
+        }
+        // getting jetted into
+        for (const p of rivals) {
+          const pr = p.presence; if (pr.dt !== 1 || powers.has('ghost')) continue;
+          const key = p.peer + ':' + num(pr.d);
+          if (processed.has(key) || now < me.invUntil) continue;
+          const d = disp.get(p.peer); if (!d) continue;
+          if (Math.hypot(d.x - me.x, d.y - me.y) < R * (scaleOf() + clamp(num(pr.z, 1), 1, 2)) + 12) {
+            processed.add(key);
+            const loss = Math.min(STEAL, me.score);
+            me.score -= loss; me.hitK++;
+            me.hits.push({ p: p.peer, k: me.hitK, n: loss }); if (me.hits.length > 4) me.hits.shift();
+            me.invUntil = now + INV_MS;
+            const dx = me.x - d.x, dy = me.y - d.y, dist = Math.hypot(dx, dy) || 1;
+            me.vx = dx / dist * 700; me.vy = dy / dist * 700; me.dashUntil = now + 160;
+            pop(me.x, me.y - R - 10, loss ? '−' + loss : 'bonk', '#ff7a9c');
+            blip(180, 0.22, 'sawtooth', 0.05, -100);
+            sendPresence(now, true);
+          }
+        }
+        // steals credited to me
+        if (myPeer) for (const p of rivals) {
+          if (!Array.isArray(p.presence.h)) continue;
+          for (const h of p.presence.h.slice(0, 8)) {
+            if (!h || h.p !== myPeer) continue;
+            const key = p.peer + ':' + num(h.k);
+            if (credited.has(key)) continue;
+            credited.add(key);
+            const n = clamp(Math.floor(num(h.n)), 0, STEAL);
+            if (n) { me.score += n; pop(me.x, me.y - R - 10, '+' + n + ' stolen', '#ffd36e'); blip(520, 0.1, 'square', 0.04, 300); }
+          }
+        }
+      }
+      if (me.score > me.best) me.best = me.score;
+      sendPresence(now, false);
+    }
+
+    draw(now, orbs, taken, swimmers, playing, phase);
+
+    if (ts - lastBoard > 200) { lastBoard = ts; renderHud(now, round, phase, playing, rivals, watchers); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  const motes = Array.from({ length: 60 }, (_, i) => ({ x: hash(i, 5, 1) * W, y: hash(i, 6, 1) * H, r: 0.8 + hash(i, 7, 1) * 2.2, s: 6 + hash(i, 8, 1) * 14, ph: hash(i, 9, 1) * 6.28 }));
+
+  function drawWater(now) {
+    const t = now / 1000;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#0f3243'); g.addColorStop(1, '#081b26');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // caustic light bands
+    ctx.save(); ctx.globalAlpha = 0.06; ctx.strokeStyle = '#bff3ea'; ctx.lineWidth = 26;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      for (let x = -40; x <= W + 40; x += 40) {
+        const y = 120 + i * 160 + Math.sin(x / 210 + t * (reduced ? 0 : 0.5) + i * 1.7) * 38 + Math.sin(x / 90 - t * (reduced ? 0 : 0.8) + i) * 10;
+        x === -40 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    // depth contours and markings
+    ctx.save(); ctx.strokeStyle = '#2a5a6e'; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2; ctx.setLineDash([3, 9]);
+    for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.ellipse(W / 2, H / 2, W * 0.16 * k, H * 0.15 * k, 0, 0, 7); ctx.stroke(); }
+    ctx.restore();
+    ctx.save(); ctx.fillStyle = '#5f8f99'; ctx.globalAlpha = 0.55; ctx.font = '500 15px "DM Mono", ui-monospace, monospace';
+    ctx.fillText('1 fm', W / 2 + W * 0.48 - 40, H / 2 + 5); ctx.fillText('2 fm', W / 2 + W * 0.32 - 40, H / 2 + 5); ctx.fillText('3 fm', W / 2 + W * 0.16 - 40, H / 2 + 5);
+    ctx.restore();
+    // motes
+    ctx.fillStyle = '#cfeee9';
+    for (const m of motes) {
+      const y = ((m.y - (reduced ? 0 : t * m.s)) % H + H) % H, x = m.x + Math.sin(t * 0.6 + m.ph) * 8;
+      ctx.globalAlpha = 0.15 + 0.15 * Math.sin(t + m.ph);
+      ctx.beginPath(); ctx.arc(x, y, m.r, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // rim
+    ctx.strokeStyle = '#2b6075'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, W - 4, H - 4);
+  }
+
+  function drawOrb(o, now) {
+    const fadeIn = clamp(o.age / 350, 0, 1), fadeOut = clamp((o.per - o.age) / 250, 0, 1), a = Math.min(fadeIn, fadeOut);
+    const t = now / 1000, bob = Math.sin(t * 2 + o.i) * 3;
+    const x = o.x, y = o.y + bob;
+    if (o.gold) {
+      const r = 12;
+      const gl = ctx.createRadialGradient(x, y, 2, x, y, r * 3.2);
+      gl.addColorStop(0, 'rgba(255,243,214,' + 0.55 * a + ')'); gl.addColorStop(1, 'rgba(255,243,214,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, 6.283); ctx.fill();
+      const b = ctx.createRadialGradient(x - 4, y - 4, 1, x, y, r);
+      b.addColorStop(0, 'rgba(255,255,255,' + a + ')'); b.addColorStop(0.6, 'rgba(255,226,236,' + a + ')'); b.addColorStop(1, 'rgba(214,190,230,' + a + ')');
+      ctx.fillStyle = b; ctx.beginPath(); ctx.arc(x, y, r * (0.9 + 0.1 * a), 0, 6.283); ctx.fill();
+    } else {
+      const pulse = 0.75 + 0.25 * Math.sin(t * 4 + o.i * 1.3);
+      const gl = ctx.createRadialGradient(x, y, 1, x, y, 18);
+      gl.addColorStop(0, 'rgba(127,227,208,' + 0.5 * a * pulse + ')'); gl.addColorStop(1, 'rgba(127,227,208,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, 18, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(214,255,246,' + a + ')';
+      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 6, y - 3, 2, 0, 6.283); ctx.arc(x - 5, y + 4, 1.6, 0, 6.283); ctx.fill();
+    }
+  }
+
+  function drawJelly(x, y, vx, vy, col, label, opts) {
+    const t = performance.now() / 1000 + (opts.seed || 0);
+    const speed = Math.hypot(vx, vy), squish = 1 + Math.sin(t * 6) * 0.05;
+    ctx.save();
+    if (opts.blink) ctx.globalAlpha = 0.35 + 0.35 * (Math.sin(t * 30) > 0 ? 1 : 0);
+    const sc = opts.scale || 1;
+    ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-x, -y);
+    // glow
+    const gr = R * (opts.dashing ? 3.6 : 2.6);
+    const g = ctx.createRadialGradient(x, y, 4, x, y, gr);
+    g.addColorStop(0, col + (opts.dashing ? '88' : '4d')); g.addColorStop(1, col + '00');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, gr, 0, 6.283); ctx.fill();
+    // tentacles trail behind the motion
+    const tx = -vx * 0.05, ty = Math.max(0, -vy * 0.03);
+    ctx.strokeStyle = col + 'b0'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+    for (let k = 0; k < 5; k++) {
+      const bx = x - 14 + k * 7, by = y + 4;
+      ctx.beginPath(); ctx.moveTo(bx, by);
+      for (let s = 1; s <= 4; s++) {
+        const len = 7 + (speed > 40 ? 2 : 0);
+        ctx.lineTo(bx + tx * s / 4 + Math.sin(t * 5 + k + s) * 3, by + s * len + ty * s / 4);
+      }
+      ctx.stroke();
+    }
+    // bell
+    const bw = R * squish, bh = R * 1.3 / squish;
+    const bell = ctx.createLinearGradient(x, y - bh, x, y + 6);
+    bell.addColorStop(0, '#ffffff'); bell.addColorStop(0.35, col); bell.addColorStop(1, col);
+    ctx.fillStyle = bell; ctx.globalAlpha *= 0.95;
+    ctx.beginPath(); ctx.moveTo(x - bw, y + 4);
+    ctx.bezierCurveTo(x - bw, y - bh, x + bw, y - bh, x + bw, y + 4);
+    for (let k = 4; k >= 0; k--) { const sx = x - bw + (k * 2 * bw) / 5; ctx.quadraticCurveTo(sx + bw / 5, y + 11, sx, y + 4); }
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = opts.blink ? ctx.globalAlpha : 1;
+    // face
+    ctx.fillStyle = '#0b2533';
+    ctx.beginPath(); ctx.arc(x - 7, y - 6, 2.6, 0, 6.283); ctx.arc(x + 7, y - 6, 2.6, 0, 6.283); ctx.fill();
+    if (opts.me) { ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 2; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(x, y - 4, R + 10, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
+    ctx.restore();
+    const ly = y - R * sc + R;
+    // label
+    ctx.save();
+    ctx.font = '500 16px "DM Mono", ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#061520cc';
+    const text = label + '  ' + opts.score;
+    const w = ctx.measureText(text).width + 14;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, ly - R - 40, w, 22, 11) : ctx.rect(x - w / 2, ly - R - 40, w, 22); ctx.fill();
+    ctx.fillStyle = opts.me ? '#fff3d6' : '#e6f4f1';
+    ctx.fillText(text, x, ly - R - 24);
+    ctx.restore();
+  }
+
+  function draw(now, orbs, taken, swimmers, playing, phase) {
+    // On small screens, zoom in and follow your jelly instead of shrinking the whole pool.
+    const fit = Math.min(view.cw / W, view.ch / H), MIN_S = 0.6;
+    if (fit < MIN_S && me.joined) {
+      const zs = MIN_S;
+      const cx = view.cw >= W * zs ? (view.cw - W * zs) / 2 : clamp(view.cw / 2 - me.x * zs, view.cw - W * zs, 0);
+      const cy = view.ch >= H * zs ? (view.ch - H * zs) / 2 : clamp(view.ch / 2 - me.y * zs, view.ch - H * zs, 0);
+      view.s = zs; view.ox = cx; view.oy = cy;
+    } else { view.s = fit; view.ox = (view.cw - W * fit) / 2; view.oy = (view.ch - H * fit) / 2; }
+    const { dpr, s, ox, oy } = view;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#061520'; ctx.fillRect(0, 0, view.cw, view.ch);
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
+    drawWater(now);
+    for (const o of orbs) if (!taken.has(o.id)) drawOrb(o, now);
+
+    for (const p of swimmers) {
+      const d = disp.get(p.peer); if (!d) continue;
+      const pr = p.presence;
+      drawJelly(d.x, d.y, num(pr.vx), num(pr.vy), colorOf(pr.c), nameOf(p), {
+        scale: clamp(num(pr.z, 1), 1, 2),
+        dashing: pr.dt === 1, score: num(pr.r) === me.round ? Math.max(0, Math.floor(num(pr.s))) : 0,
+        seed: (p.peer.charCodeAt(0) || 0) / 10
+      });
+    }
+    for (const b of bots) drawJelly(b.x, b.y, b.vx, b.vy, COLORS[b.c], b.name + ' (bot)', {
+      dashing: now < b.dashUntil, blink: now < b.invUntil, score: b.score, seed: b.seed
+    });
+    if (me.joined) drawJelly(me.x, me.y, me.vx, me.vy, COLORS[me.c], me.name, {
+      me: true, scale: scaleOf(), dashing: now < me.dashUntil, blink: now < me.invUntil, score: me.score
+    });
+
+    // popups
+    const pt = performance.now();
+    ctx.save(); ctx.textAlign = 'center'; ctx.font = '600 22px "Fredoka", "Trebuchet MS", sans-serif';
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const p = popups[i], age = (pt - p.t) / 900;
+      if (age >= 1) { popups.splice(i, 1); continue; }
+      ctx.globalAlpha = 1 - age; ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y - age * 40);
+    }
+    ctx.restore();
+
+    // steering hint
+    if (steer && me.joined) {
+      ctx.save(); ctx.strokeStyle = '#fff3d6'; ctx.globalAlpha = 0.35; ctx.lineWidth = 2; ctx.setLineDash([4, 8]);
+      ctx.beginPath(); ctx.moveTo(me.x, me.y); ctx.lineTo(steer.x, steer.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.arc(steer.x, steer.y, 10, 0, 6.283); ctx.stroke(); ctx.restore();
+    }
+
+    if (!playing) { ctx.fillStyle = 'rgba(6,21,32,0.35)'; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // ---------- HUD ----------
+  function li(cls, color, name, score, rank) {
+    const el = document.createElement('li'); if (cls) el.className = cls;
+    if (rank != null) { const r = document.createElement('span'); r.className = 'rk'; r.textContent = rank; el.append(r); }
+    const d = document.createElement('span'); d.className = 'dot'; d.style.background = color;
+    const n = document.createElement('span'); n.className = 'nm'; n.textContent = name;
+    const s = document.createElement('span'); s.textContent = score;
+    el.append(d, n, s); return el;
+  }
+  function standings(rivals) {
+    const list = rivals.map(p => ({ name: nameOf(p), color: colorOf(p.presence.c), score: Math.max(0, Math.floor(num(p.presence.s))), me: false }));
+    for (const b of bots) list.push({ name: b.name + ' (bot)', color: COLORS[b.c], score: b.score, me: false });
+    if (me.joined) list.push({ name: me.name, color: COLORS[me.c], score: me.score, me: true });
+    return list.sort((a, b) => b.score - a.score || (a.me ? -1 : 1));
+  }
+
+  let resultsKey = '';
+  function renderHud(now, round, phase, playing, rivals, watchers) {
+    $('clock').innerHTML = '';
+    const label = document.createTextNode(playing ? 'Tide ends in ' : 'Next tide in ');
+    const b = document.createElement('b'); b.textContent = fmt(playing ? PLAY - phase : CYCLE - phase);
+    $('clock').append(label, b);
+
+    const swimming = rivals.length + (me.joined ? 1 : 0);
+    let crowd;
+    if (roomState !== 'live') crowd = 'Connecting…';
+    else crowd = swimming + ' in the pool' + (watchers ? ' · ' + watchers + ' watching' : '');
+    $('crowd').textContent = crowd;
+
+    const list = standings(rivals);
+    const ol = $('board'); ol.replaceChildren();
+    if (!list.length) { const e = document.createElement('li'); e.className = 'empty'; e.textContent = 'No one is swimming yet.'; ol.append(e); }
+    else {
+      const top = list.slice(0, 6);
+      if (me.joined && !top.some(x => x.me)) top[top.length - 1] = list.find(x => x.me);
+      for (const x of top) ol.append(li(x.me ? 'me' : '', x.color, x.name, x.score));
+    }
+
+    const note = $('note');
+    if (roomState !== 'live') note.textContent = 'Can\'t reach the game server. Retrying…';
+    else if (room && me.joined && bots.length) note.textContent = 'Bots are keeping you company. Share this page and anyone who opens it joins your tide; the bots leave when they arrive.';
+    else note.textContent = '';
+
+    $('dash').hidden = !me.joined;
+    $('dash').disabled = !playing || now < me.dashReady;
+
+    const res = $('results');
+    if (!playing && me.joined) {
+      res.hidden = false;
+      $('resNext').textContent = 'Next tide in ' + fmt(CYCLE - phase);
+      const key = round + '|' + list.map(x => x.name + x.score).join(',');
+      if (key !== resultsKey) {
+        resultsKey = key;
+        const winner = list[0];
+        $('resTitle').textContent = !winner || winner.score === 0 ? 'Low tide. Nobody glowed.' : (winner.me ? 'You took the tide!' : winner.name + ' took the tide');
+        const pod = $('podium'); pod.replaceChildren();
+        list.slice(0, 5).forEach((x, i) => pod.append(li(x.me ? 'me' : '', x.color, x.name + (x.me ? ' (you)' : ''), x.score, i + 1)));
+        if (me.joined && !list.slice(0, 5).some(x => x.me)) { const i = list.findIndex(x => x.me); pod.append(li('me', COLORS[me.c], me.name + ' (you)', me.score, i + 1)); }
+      }
+    } else res.hidden = true;
+  }
+
+  // ---------- join ----------
+  const sw = $('swatches');
+  COLORS.forEach((c, i) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.style.background = c;
+    btn.setAttribute('aria-label', 'Glow color ' + (i + 1)); btn.setAttribute('aria-pressed', String(i === me.c));
+    btn.addEventListener('click', () => { me.c = i; sw.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-pressed', String(j === i))); });
+    sw.append(btn);
+  });
+  $('nameInput').value = me.name;
+  $('joinForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const raw = $('nameInput').value.replace(/[\u0000-\u001f\u007f​-‏‪-‮⁠-⁤﻿]/g, '').trim();
+    me.name = (raw && !clean(raw) ? raw : 'Jelly ' + Math.floor(10 + Math.random() * 90)).slice(0, 14);
+    me.joined = true;
+    me.x = 120 + Math.random() * (W - 240); me.y = 120 + Math.random() * (H - 240);
+    save();
+    $('join').hidden = true;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume && ac.resume(); } catch {}
+    blip(440, 0.12, 'sine', 0.06, 440);
+    cv.focus && cv.focus();
+    sendPresence(Date.now(), true);
+  });
+
+  const muteBtn = $('mute');
+  const syncMute = () => { muteBtn.textContent = muted ? 'Sound off' : 'Sound on'; muteBtn.setAttribute('aria-pressed', String(muted)); };
+  muteBtn.addEventListener('click', () => { muted = !muted; save(); syncMute(); if (!muted) { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); } catch {} } });
+  syncMute();
+
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
